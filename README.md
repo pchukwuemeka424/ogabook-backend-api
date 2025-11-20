@@ -21,19 +21,19 @@ npm install
 2. Create a `.env` file in the root directory:
 ```env
 # Supabase Configuration
-SUPABASE_URL=https://ldtayamrxisvypqzvldo.supabase.co
+SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 # Database Connection (PostgreSQL)
-DATABASE_URL=postgresql://postgres:Iz98HAD7jElqdiRk@db.ldtayamrxisvypqzvldo.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres:your_password@db.your-project.supabase.co:5432/postgres
 
 # JWT Secret for Admin Authentication
 JWT_SECRET=your_jwt_secret_key_change_this_in_production
 
 # Admin Credentials (for initial setup)
-ADMIN_EMAIL=admin@ogabook.com
-ADMIN_PASSWORD=holiday100@
+ADMIN_EMAIL=your_admin_email@example.com
+ADMIN_PASSWORD=your_secure_password
 
 # Server Configuration
 PORT=3000
@@ -60,8 +60,8 @@ POST /api/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@ogabook.com",
-  "password": "holiday100@"
+  "email": "your_admin_email@example.com",
+  "password": "your_secure_password"
 }
 ```
 
@@ -73,7 +73,7 @@ Response:
   "token": "jwt_token_here",
   "admin": {
     "id": 1,
-    "email": "admin@ogabook.com"
+    "email": "your_admin_email@example.com"
   }
 }
 ```
@@ -167,7 +167,7 @@ The admin login uses the `users` table in your database. You must have a user ac
 - `is_active` set to `true`
 
 To create or update an admin user in the `users` table, you can:
-1. Use the setup script: `npm run setup-admin` (creates admin@ogabook.com)
+1. Use the setup script: `npm run setup-admin` (creates your_admin_email@example.com)
 2. Manually create a user through the admin panel
 3. Insert directly into the database
 
@@ -198,7 +198,7 @@ ogabookadmin/
 ```bash
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@ogabook.com","password":"holiday100@"}'
+  -d '{"email":"your_admin_email@example.com","password":"your_secure_password"}'
 ```
 
 2. Get all tables:
@@ -221,8 +221,8 @@ const loginResponse = await fetch('http://localhost:3000/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    email: 'admin@ogabook.com',
-    password: 'holiday100@'
+    email: 'your_admin_email@example.com',
+    password: 'your_secure_password'
   })
 });
 
@@ -260,3 +260,8 @@ const tables = await tablesResponse.json();
 
 ISC
 
+
+# Flutterwave Payment Configuration
+FLUTTERWAVE_PUBLIC_KEY=your_flutterwave_public_key
+FLUTTERWAVE_SECRET_KEY=your_flutterwave_secret_key
+FLUTTERWAVE_ENCRYPTION_KEY=your_flutterwave_encryption_key
