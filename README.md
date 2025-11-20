@@ -10,6 +10,9 @@ A comprehensive admin panel for managing your Supabase database with Node.js and
 - ✏️ Create, update, and delete records
 - 📋 View table structures and schemas
 - 🔧 Execute custom SQL queries (with safety checks)
+- 💳 Flutterwave payment integration
+- 🗑️ Account deletion functionality
+- 📱 Subscription management
 
 ## Installation
 
@@ -18,7 +21,6 @@ A comprehensive admin panel for managing your Supabase database with Node.js and
 npm install
 ```
 
-<<<<<<< HEAD
 2. Create a `.env` file in the root directory:
 ```env
 # Supabase Configuration
@@ -39,10 +41,12 @@ ADMIN_PASSWORD=your_secure_password
 # Server Configuration
 PORT=3000
 NODE_ENV=development
-```
-=======
 
->>>>>>> 9a6d16615356cec2994ac0663b5ebb765cbb655a
+# Flutterwave Payment Configuration
+FLUTTERWAVE_PUBLIC_KEY=your_flutterwave_public_key
+FLUTTERWAVE_SECRET_KEY=your_flutterwave_secret_key
+FLUTTERWAVE_ENCRYPTION_KEY=your_flutterwave_encryption_key
+```
 
 3. Start the server:
 ```bash
@@ -65,7 +69,7 @@ Content-Type: application/json
 
 {
   "email": "your_admin_email@example.com",
-  "password": "your_secure_password"
+  "password": "your_password"
 }
 ```
 
@@ -86,6 +90,16 @@ Response:
 ```http
 GET /api/auth/verify
 Authorization: Bearer <token>
+```
+
+#### Delete Account
+```http
+POST /api/auth/delete-account
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
 ```
 
 ### Database Management
@@ -154,6 +168,34 @@ Content-Type: application/json
 
 **Note:** Dangerous operations (DROP, TRUNCATE, DELETE FROM, ALTER TABLE, etc.) are blocked for security.
 
+### Payment
+
+#### Initialize Payment
+```http
+POST /api/payment/initialize
+Content-Type: application/json
+
+{
+  "userId": "user-id",
+  "userEmail": "user@example.com",
+  "userPhone": "+1234567890",
+  "package": "basic",
+  "billingCycle": "monthly",
+  "amount": "200",
+  "status": "pending"
+}
+```
+
+#### Verify Payment
+```http
+POST /api/payment/verify
+Content-Type: application/json
+
+{
+  "txRef": "transaction-reference"
+}
+```
+
 ## Security Features
 
 - JWT-based authentication
@@ -162,6 +204,7 @@ Content-Type: application/json
 - Table name validation
 - Restricted dangerous SQL operations
 - Service role key for admin operations
+- Environment variable protection
 
 ## Admin Login
 
@@ -171,7 +214,7 @@ The admin login uses the `users` table in your database. You must have a user ac
 - `is_active` set to `true`
 
 To create or update an admin user in the `users` table, you can:
-1. Use the setup script: `npm run setup-admin` (creates your_admin_email@example.com)
+1. Use the setup script: `npm run setup-admin` (creates admin user with credentials from .env)
 2. Manually create a user through the admin panel
 3. Insert directly into the database
 
@@ -181,16 +224,29 @@ To create or update an admin user in the `users` table, you can:
 
 ```
 ogabookadmin/
+├── assets/
+│   └── logo.png              # Application logo
 ├── config/
-│   └── supabase.js          # Supabase and PostgreSQL configuration
+│   └── supabase.js           # Supabase and PostgreSQL configuration
 ├── middleware/
-│   └── auth.js              # Authentication middleware
+│   └── auth.js               # Authentication middleware
 ├── routes/
-│   ├── auth.js              # Authentication routes
-│   └── database.js          # Database management routes
-├── server.js                # Express server setup
+│   ├── auth.js               # Authentication routes
+│   ├── database.js           # Database management routes
+│   ├── payment.js            # Payment routes (Flutterwave)
+│   └── web.js                # Web page routes
+├── views/
+│   ├── account-deleted.ejs   # Account deletion success page
+│   ├── delete-account.ejs    # Account deletion page
+│   ├── payment-*.ejs         # Payment pages (success, failed, cancelled)
+│   ├── subscription.ejs      # Subscription checkout page
+│   └── ...                   # Other view files
+├── scripts/
+│   ├── check-tables.js       # Database table checker
+│   └── setup-admin-user.js   # Admin user setup script
+├── server.js                 # Express server setup
 ├── package.json
-├── .env                     # Environment variables (create this)
+├── .env                      # Environment variables (create this)
 └── README.md
 ```
 
@@ -202,7 +258,7 @@ ogabookadmin/
 ```bash
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"your_admin_email@example.com","password":"your_secure_password"}'
+  -d '{"email":"your_admin_email@example.com","password":"your_password"}'
 ```
 
 2. Get all tables:
@@ -226,7 +282,7 @@ const loginResponse = await fetch('http://localhost:3000/api/auth/login', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     email: 'your_admin_email@example.com',
-    password: 'your_secure_password'
+    password: 'your_password'
   })
 });
 
@@ -240,6 +296,17 @@ const tablesResponse = await fetch('http://localhost:3000/api/database/tables', 
 const tables = await tablesResponse.json();
 ```
 
+## Web Pages
+
+- `/login` - Admin login page
+- `/dashboard` - Admin dashboard
+- `/delete-account` - Public account deletion page
+- `/account-deleted` - Account deletion success page
+- `/` - Subscription checkout page (with query parameters: userId, package, billingCycle, amount, status)
+- `/payment/success` - Payment success page
+- `/payment/failed` - Payment failed page
+- `/payment/cancelled` - Payment cancelled page
+
 ## Environment Variables
 
 | Variable | Description | Required |
@@ -249,8 +316,20 @@ const tables = await tablesResponse.json();
 | `ADMIN_EMAIL` | Default admin email | No |
 | `ADMIN_PASSWORD` | Default admin password | No |
 | `PORT` | Server port | No (default: 3000) |
-| `SUPABASE_URL` | Supabase project URL | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | No |
+| `NODE_ENV` | Environment (development/production) | No |
+| `SUPABASE_URL` | Supabase project URL | Yes |
+| `SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
+| `FLUTTERWAVE_PUBLIC_KEY` | Flutterwave public key | Yes (for payments) |
+| `FLUTTERWAVE_SECRET_KEY` | Flutterwave secret key | Yes (for payments) |
+| `FLUTTERWAVE_ENCRYPTION_KEY` | Flutterwave encryption key | Yes (for payments) |
+
+## Scripts
+
+- `npm start` - Start the server
+- `npm run dev` - Start server with auto-reload (nodemon)
+- `npm run setup-admin` - Create/update admin user in database
+- `npm run check-tables` - Check database tables
 
 ## Notes
 
@@ -259,13 +338,10 @@ const tables = await tablesResponse.json();
 - All database operations use parameterized queries to prevent SQL injection
 - The system validates table names before executing queries
 - Custom SQL queries are restricted to prevent dangerous operations
+- Never commit `.env` file to version control
+- Keep all API keys and secrets secure
+- Flutterwave payment integration requires valid API keys
 
 ## License
 
 ISC
-
-
-# Flutterwave Payment Configuration
-FLUTTERWAVE_PUBLIC_KEY=your_flutterwave_public_key
-FLUTTERWAVE_SECRET_KEY=your_flutterwave_secret_key
-FLUTTERWAVE_ENCRYPTION_KEY=your_flutterwave_encryption_key
