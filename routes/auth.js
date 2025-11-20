@@ -119,6 +119,67 @@ router.get('/verify', async (req, res) => {
   }
 });
 
+// Get User Email by ID (Public endpoint - no auth required, for subscription page)
+router.get('/user/email/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    // Try to fetch user email - handle both UUID and string ID formats
+    let userResult;
+    try {
+      // First try with the userId as-is (could be UUID or string)
+      userResult = await pool.query(
+        'SELECT email, phone FROM users WHERE id = $1',
+        [userId]
+      );
+    } catch (idError) {
+      // If that fails, try casting to text (for UUID compatibility)
+      console.log('First query attempt failed, trying text cast:', idError.message);
+      try {
+        userResult = await pool.query(
+          'SELECT email, phone FROM users WHERE id::text = $1',
+          [userId]
+        );
+      } catch (textError) {
+        console.error('Error fetching user email:', textError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error fetching user details',
+          error: textError.message
+        });
+      }
+    }
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const user = userResult.rows[0];
+    res.json({
+      success: true,
+      email: user.email || null,
+      phone: user.phone || null
+    });
+  } catch (error) {
+    console.error('Error fetching user email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching user email',
+      error: error.message
+    });
+  }
+});
+
 // Delete Account by Email (Public endpoint - no auth required)
 router.post('/delete-account', async (req, res) => {
   try {

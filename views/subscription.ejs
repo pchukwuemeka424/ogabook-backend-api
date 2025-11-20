@@ -320,8 +320,26 @@
         return 'basic';
     }
 
+    // Fetch user email from API if missing
+    async function fetchUserEmail(userId) {
+        if (!userId) return null;
+        
+        try {
+            const response = await fetch(`/api/auth/user/email/${encodeURIComponent(userId)}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.email) {
+                    return data.email;
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching user email:', error);
+        }
+        return null;
+    }
+
     // Display subscription details
-    function displaySubscriptionDetails() {
+    async function displaySubscriptionDetails() {
         const params = getUrlParams();
         
         // Check if required parameters are present
@@ -333,8 +351,23 @@
 
         // Display values
         document.getElementById('userIdDisplay').textContent = params.userId || '-';
-        document.getElementById('emailDisplay').textContent = params.userEmail || 'Not available';
-        document.getElementById('phoneDisplay').textContent = params.userPhone || 'Not available';
+        
+        // If email is missing, try to fetch it
+        let displayEmail = params.userEmail;
+        let displayPhone = params.userPhone;
+        
+        if (!displayEmail) {
+            document.getElementById('emailDisplay').textContent = 'Loading...';
+            const fetchedEmail = await fetchUserEmail(params.userId);
+            if (fetchedEmail) {
+                displayEmail = fetchedEmail;
+                // Update subscriptionData for later use
+                subscriptionData.userEmail = fetchedEmail;
+            }
+        }
+        
+        document.getElementById('emailDisplay').textContent = displayEmail || 'Not available';
+        document.getElementById('phoneDisplay').textContent = displayPhone || 'Not available';
         document.getElementById('packageBadge').textContent = formatPackageName(params.package);
         document.getElementById('packageBadge').className = `package-badge ${getPackageBadgeClass(params.package)}`;
         document.getElementById('billingCycleDisplay').textContent = formatBillingCycle(params.billingCycle);
@@ -365,7 +398,16 @@
             return;
         }
 
-        if (!params.userEmail) {
+        // If email is still missing, try to fetch it one more time
+        let userEmail = params.userEmail;
+        if (!userEmail) {
+            userEmail = await fetchUserEmail(params.userId);
+            if (userEmail) {
+                subscriptionData.userEmail = userEmail;
+            }
+        }
+
+        if (!userEmail) {
             showError('User email is required for payment. Please ensure the user exists in the system.');
             return;
         }
@@ -385,7 +427,7 @@
                 },
                 body: JSON.stringify({
                     userId: params.userId,
-                    userEmail: params.userEmail,
+                    userEmail: userEmail,
                     userPhone: params.userPhone || '',
                     package: params.package,
                     billingCycle: params.billingCycle || 'monthly',

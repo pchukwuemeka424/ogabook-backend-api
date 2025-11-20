@@ -46,10 +46,22 @@ router.get('/', optionalAuth, async (req, res) => {
   if (userId && pkg && amount) {
     try {
       // Fetch user details from database
-      const userResult = await pool.query(
-        'SELECT id, email, phone FROM users WHERE id = $1',
-        [userId]
-      );
+      // Try to handle both UUID and string ID formats
+      let userResult;
+      try {
+        // First try with the userId as-is (could be UUID or string)
+        userResult = await pool.query(
+          'SELECT id, email, phone FROM users WHERE id = $1',
+          [userId]
+        );
+      } catch (idError) {
+        // If that fails, try casting to text (for UUID compatibility)
+        console.log('First query attempt failed, trying text cast:', idError.message);
+        userResult = await pool.query(
+          'SELECT id, email, phone FROM users WHERE id::text = $1',
+          [userId]
+        );
+      }
 
       let userEmail = '';
       let userPhone = '';
@@ -57,6 +69,9 @@ router.get('/', optionalAuth, async (req, res) => {
       if (userResult.rows.length > 0) {
         userEmail = userResult.rows[0].email || '';
         userPhone = userResult.rows[0].phone || '';
+        console.log(`Successfully fetched user details for userId: ${userId}, email: ${userEmail ? 'found' : 'missing'}`);
+      } else {
+        console.warn(`No user found with userId: ${userId}`);
       }
 
       // Render subscription page with parameters
@@ -72,7 +87,10 @@ router.get('/', optionalAuth, async (req, res) => {
       });
     } catch (error) {
       console.error('Error fetching user details:', error);
+      console.error('Error stack:', error.stack);
+      console.error('UserId that failed:', userId);
       // Still render the page even if user fetch fails
+      // Client-side will attempt to fetch email as fallback
       res.render('subscription', {
         title: 'Subscription - OgaBook',
         userId: userId,
