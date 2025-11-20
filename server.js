@@ -96,12 +96,14 @@ app.use((req, res) => {
   res.redirect('/login');
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 API available at http://localhost:${PORT}`);
-  console.log(`🔐 Admin login: POST http://localhost:${PORT}/api/auth/login`);
-});
+// Start server (only if not in Vercel serverless environment)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📡 API available at http://localhost:${PORT}`);
+    console.log(`🔐 Admin login: POST http://localhost:${PORT}/api/auth/login`);
+  });
+}
 
 module.exports = app;
 
