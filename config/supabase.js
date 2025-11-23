@@ -17,14 +17,19 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey
 
 // PostgreSQL Pool for direct database access
 // IMPORTANT: DATABASE_URL must be set in Vercel environment variables
-// Format: postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres
-// Get the correct connection string from Supabase Dashboard > Settings > Database > Connection string
+// For Vercel/Serverless: Use Connection Pooler URL (NOT direct connection)
+// Format (Connection Pooler): postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+// Get it from: Supabase Dashboard > Settings > Database > Connection Pooling
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   console.error('⚠️  WARNING: DATABASE_URL environment variable is not set!');
   console.error('   Please set DATABASE_URL in your Vercel project settings.');
-  console.error('   Get the connection string from: Supabase Dashboard > Settings > Database');
+  console.error('   For Vercel: Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling');
+} else if (databaseUrl.includes('db.') && databaseUrl.includes('.supabase.co:5432')) {
+  console.warn('⚠️  WARNING: You are using a direct connection URL. For Vercel/serverless, use Connection Pooler URL instead!');
+  console.warn('   Direct URLs often cause ENOTFOUND errors on serverless platforms.');
+  console.warn('   Get the pooler URL from: Supabase Dashboard > Settings > Database > Connection Pooling');
 }
 
 const pool = new Pool({

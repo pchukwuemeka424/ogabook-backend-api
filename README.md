@@ -347,23 +347,32 @@ const tables = await tablesResponse.json();
    
    - `SUPABASE_URL` - Your Supabase project URL
    
-   - `SUPABASE_ANON_KEY` - Your Supabase anonymous key
+   - `SUPABASE_ANON_KEY` - Your Supabase anonymous key (from Settings > API)
    
-   - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key
+   - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (from Settings > API)
+     - **Important**: This is DIFFERENT from the anon key - it has admin privileges
+     - Get it from: Supabase Dashboard > Settings > API > service_role key (secret)
 
 4. After adding variables, redeploy your application
 
 ### Getting Your Database Connection String
 
+**IMPORTANT for Vercel/Serverless**: You must use the **Connection Pooler** URL, not the direct connection URL.
+
 1. Go to [Supabase Dashboard](https://app.supabase.com)
 2. Select your project
 3. Go to **Settings** > **Database**
-4. Scroll to **Connection string** section
-5. Select **URI** mode
-6. Copy the connection string (it includes your password)
+4. Scroll to **Connection Pooling** section (NOT "Connection string")
+5. Select **Session mode** or **Transaction mode**
+6. Copy the connection string (format: `postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`)
 7. Paste it as the `DATABASE_URL` value in Vercel
 
-**Note**: If you see `ENOTFOUND` errors, it means `DATABASE_URL` is not set correctly in Vercel.
+**Why Connection Pooler?**
+- Direct connection URLs (`db.[PROJECT].supabase.co`) often fail with `ENOTFOUND` errors on serverless platforms
+- Connection pooler provides IPv4-compatible addresses that work reliably with Vercel
+- Better for serverless functions that have short-lived connections
+
+**Note**: If you see `ENOTFOUND` errors, you're likely using the direct connection URL instead of the connection pooler URL.
 
 ## Notes
 
