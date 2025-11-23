@@ -4,6 +4,11 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
+// Set NODE_ENV to development if not set (for better error messages)
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'development';
+}
+
 const authRoutes = require('./routes/auth');
 const databaseRoutes = require('./routes/database');
 const webRoutes = require('./routes/web');

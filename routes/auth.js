@@ -20,11 +20,13 @@ router.post('/login', async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Find user in users table by email (case-insensitive)
+    // Try multiple query approaches for compatibility
     let result;
     try {
+      // First try: Simple case-insensitive comparison
       result = await pool.query(
-        'SELECT * FROM users WHERE LOWER(TRIM(email)) = $1',
-        [normalizedEmail]
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [email.trim()]
       );
     } catch (dbError) {
       console.error('Database query error during login:', dbError);
@@ -32,7 +34,8 @@ router.post('/login', async (req, res) => {
         message: dbError.message,
         code: dbError.code,
         detail: dbError.detail,
-        hint: dbError.hint
+        hint: dbError.hint,
+        stack: dbError.stack
       });
       
       // Check if it's a connection error
@@ -53,7 +56,17 @@ router.post('/login', async (req, res) => {
         });
       }
       
-      throw dbError;
+      // Return detailed error in development
+      return res.status(500).json({
+        success: false,
+        message: 'Database query failed',
+        error: process.env.NODE_ENV === 'development' ? dbError.message : 'Query error',
+        details: process.env.NODE_ENV === 'development' ? {
+          code: dbError.code,
+          detail: dbError.detail,
+          hint: dbError.hint
+        } : undefined
+      });
     }
 
     if (result.rows.length === 0) {
@@ -137,10 +150,19 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    
+    // Return detailed error information
     res.status(500).json({
       success: false,
       message: 'Server error during login',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred',
+      details: process.env.NODE_ENV === 'development' ? {
+        name: error.name,
+        code: error.code,
+        stack: error.stack
+      } : undefined
     });
   }
 });
