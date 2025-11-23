@@ -8,6 +8,9 @@ const { pool, supabase } = require('../config/supabase');
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    // Log login attempt (without sensitive data)
+    console.log(`[LOGIN] Attempt from: ${req.ip}, Email: ${email ? email.substring(0, 3) + '***' : 'missing'}`);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -67,16 +70,20 @@ router.post('/login', async (req, res) => {
         });
       }
       
-      // Return detailed error in development
+      // Return detailed error (show in production for debugging)
       return res.status(500).json({
         success: false,
         message: 'Database query failed',
-        error: process.env.NODE_ENV === 'development' ? dbError.message : 'Query error',
-        details: process.env.NODE_ENV === 'development' ? {
+        error: dbError.message,
+        code: dbError.code,
+        hint: dbError.code === 'ENOTFOUND' 
+          ? 'Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling'
+          : dbError.hint || 'Check your DATABASE_URL environment variable in Vercel',
+        details: {
           code: dbError.code,
           detail: dbError.detail,
           hint: dbError.hint
-        } : undefined
+        }
       });
     }
 
@@ -159,21 +166,23 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Error name:', error.name);
-    console.error('Error code:', error.code);
+    console.error('[LOGIN ERROR]', {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n') // First 5 lines of stack
+    });
     
-    // Return detailed error information
+    // Return detailed error information (show in production for debugging)
     res.status(500).json({
       success: false,
       message: 'Server error during login',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred',
-      details: process.env.NODE_ENV === 'development' ? {
-        name: error.name,
-        code: error.code,
-        stack: error.stack
-      } : undefined
+      error: error.message,
+      code: error.code,
+      name: error.name,
+      hint: error.code === 'ENOTFOUND' 
+        ? 'Database connection failed. Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling'
+        : 'Check Vercel logs for more details'
     });
   }
 });

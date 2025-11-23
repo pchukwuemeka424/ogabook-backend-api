@@ -32,12 +32,22 @@ if (!databaseUrl) {
   console.warn('   Get the pooler URL from: Supabase Dashboard > Settings > Database > Connection Pooling');
 }
 
-const pool = new Pool({
+// Configure pool for serverless environments (Vercel)
+const poolConfig = {
   connectionString: databaseUrl || 'postgresql://postgres:Iz98HAD7jElqdiRk@db.ldtayamrxisvypqzvldo.supabase.co:5432/postgres',
   ssl: {
     rejectUnauthorized: false
   }
-});
+};
+
+// For serverless (Vercel), use smaller connection pool and shorter timeouts
+if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
+  poolConfig.max = 1; // Single connection for serverless
+  poolConfig.idleTimeoutMillis = 30000; // 30 seconds
+  poolConfig.connectionTimeoutMillis = 10000; // 10 seconds
+}
+
+const pool = new Pool(poolConfig);
 
 // Test database connection
 pool.on('connect', () => {
