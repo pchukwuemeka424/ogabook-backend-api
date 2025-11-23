@@ -8,6 +8,9 @@ const { pool, supabase } = require('../config/supabase');
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    // Log login attempt (without sensitive data)
+    console.log(`[LOGIN] Attempt from: ${req.ip}, Email: ${email ? email.substring(0, 3) + '***' : 'missing'}`);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -16,11 +19,84 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find user in users table by email
-    const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    );
+    // Normalize email to lowercase for case-insensitive comparison
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user in users table by email (case-insensitive)
+    let result;
+    try {
+      // Execute query using pool (automatically handles connection management)
+      result = await pool.query(
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [email.trim()]
+      );
+    } catch (dbError) {
+      console.error('Database query error during login:', dbError);
+      console.error('Error details:', {
+        message: dbError.message,
+        code: dbError.code,
+        detail: dbError.detail,
+        hint: dbError.hint,
+        stack: dbError.stack
+      });
+      
+      // Check if it's a DNS/hostname resolution error (ENOTFOUND)
+      if (dbError.code === 'ENOTFOUND' || dbError.errno === -3007) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database connection failed: Cannot resolve database hostname',
+          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Database hostname not found',
+          hint: 'Please check your DATABASE_URL environment variable in Vercel. The database hostname may be incorrect or the DATABASE_URL may not be set.'
+        });
+      }
+      
+      // Check if it's a connection error
+      if (dbError.code === 'ECONNREFUSED' || dbError.code === 'ETIMEDOUT' || dbError.message.includes('connection')) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database connection failed. Please check your database configuration.',
+          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Connection error',
+          hint: 'Verify your DATABASE_URL environment variable is set correctly in Vercel.'
+        });
+      }
+      
+      // Check if table doesn't exist
+      if (dbError.message.includes('does not exist') || dbError.code === '42P01') {
+        return res.status(500).json({
+          success: false,
+          message: 'Database table not found. Please ensure the users table exists.',
+          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Table not found'
+        });
+      }
+      
+      // Return detailed error (show in production for debugging)
+      const errorResponse = {
+        success: false,
+        message: 'Database query failed',
+        error: dbError.message,
+        code: dbError.code || 'UNKNOWN',
+        hint: dbError.code === 'ENOTFOUND' 
+          ? 'Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling'
+          : dbError.code === '28P01' || dbError.message.includes('password')
+          ? 'Database authentication failed. Check your DATABASE_URL password in Vercel.'
+          : dbError.code === '3D000' || dbError.message.includes('database')
+          ? 'Database does not exist. Check your DATABASE_URL connection string.'
+          : dbError.hint || 'Check your DATABASE_URL environment variable in Vercel',
+        details: {
+          code: dbError.code,
+          detail: dbError.detail,
+          hint: dbError.hint,
+          errno: dbError.errno,
+          syscall: dbError.syscall,
+          hostname: dbError.hostname
+        }
+      };
+      
+      // Log full error for debugging
+      console.error('[DB ERROR] Full error object:', JSON.stringify(errorResponse, null, 2));
+      
+      return res.status(500).json(errorResponse);
+    }
 
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -40,7 +116,17 @@ router.post('/login', async (req, res) => {
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    let isValidPassword;
+    try {
+      isValidPassword = await bcrypt.compare(password, user.password_hash);
+    } catch (bcryptError) {
+      console.error('Bcrypt error during password verification:', bcryptError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error verifying password',
+        error: process.env.NODE_ENV === 'development' ? bcryptError.message : 'Password verification failed'
+      });
+    }
 
     if (!isValidPassword) {
       return res.status(401).json({
@@ -49,7 +135,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check if user is active
+    // Check if user is active (handle both boolean and null cases)
     if (user.is_active === false) {
       return res.status(403).json({
         success: false,
@@ -58,16 +144,26 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
-    const token = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email,
-        username: user.username,
-        role: user.role || 'admin'
-      },
-      process.env.JWT_SECRET || 'your_jwt_secret_key_change_this_in_production',
-      { expiresIn: '24h' }
-    );
+    let token;
+    try {
+      token = jwt.sign(
+        { 
+          id: user.id, 
+          email: user.email,
+          username: user.username,
+          role: user.role || 'admin'
+        },
+        process.env.JWT_SECRET || 'your_jwt_secret_key_change_this_in_production',
+        { expiresIn: '24h' }
+      );
+    } catch (jwtError) {
+      console.error('JWT signing error:', jwtError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error generating authentication token',
+        error: process.env.NODE_ENV === 'development' ? jwtError.message : 'Token generation failed'
+      });
+    }
 
     res.json({
       success: true,
@@ -81,11 +177,23 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('[LOGIN ERROR]', {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n') // First 5 lines of stack
+    });
+    
+    // Return detailed error information (show in production for debugging)
     res.status(500).json({
       success: false,
       message: 'Server error during login',
-      error: error.message
+      error: error.message,
+      code: error.code,
+      name: error.name,
+      hint: error.code === 'ENOTFOUND' 
+        ? 'Database connection failed. Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling'
+        : 'Check Vercel logs for more details'
     });
   }
 });

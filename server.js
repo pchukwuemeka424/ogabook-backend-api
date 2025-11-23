@@ -4,6 +4,11 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
+// Set NODE_ENV to development if not set (for better error messages)
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'development';
+}
+
 const authRoutes = require('./routes/auth');
 const databaseRoutes = require('./routes/database');
 const webRoutes = require('./routes/web');
@@ -43,6 +48,34 @@ app.get('/health', (req, res) => {
     message: 'Server is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// Database health check endpoint
+app.get('/health/db', async (req, res) => {
+  try {
+    const { pool } = require('./config/supabase');
+    const result = await pool.query('SELECT NOW() as current_time, version() as pg_version');
+    res.json({
+      success: true,
+      message: 'Database connection successful',
+      database: {
+        time: result.rows[0].current_time,
+        version: result.rows[0].pg_version.split(' ')[0] + ' ' + result.rows[0].pg_version.split(' ')[1]
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Database connection failed',
+      error: error.message,
+      code: error.code,
+      hint: error.code === 'ENOTFOUND' 
+        ? 'Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling'
+        : 'Check your DATABASE_URL environment variable in Vercel'
+    });
+  }
 });
 
 // API info endpoint

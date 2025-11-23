@@ -16,12 +16,52 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey
 });
 
 // PostgreSQL Pool for direct database access
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:Iz98HAD7jElqdiRk@db.ldtayamrxisvypqzvldo.supabase.co:5432/postgres',
+// IMPORTANT: DATABASE_URL must be set in Vercel environment variables
+// For Vercel/Serverless: Use Connection Pooler URL (NOT direct connection)
+// Format (Connection Pooler): postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+// Get it from: Supabase Dashboard > Settings > Database > Connection Pooling
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  console.error('⚠️  WARNING: DATABASE_URL environment variable is not set!');
+  console.error('   Please set DATABASE_URL in your Vercel project settings.');
+  console.error('   For Vercel: Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling');
+} else if (databaseUrl.includes('db.') && databaseUrl.includes('.supabase.co:5432')) {
+  console.warn('⚠️  WARNING: You are using a direct connection URL. For Vercel/serverless, use Connection Pooler URL instead!');
+  console.warn('   Direct URLs often cause ENOTFOUND errors on serverless platforms.');
+  console.warn('   Get the pooler URL from: Supabase Dashboard > Settings > Database > Connection Pooling');
+}
+
+// Configure pool for serverless environments (Vercel)
+const poolConfig = {
+  connectionString: databaseUrl || 'postgresql://postgres:Iz98HAD7jElqdiRk@db.ldtayamrxisvypqzvldo.supabase.co:5432/postgres',
   ssl: {
     rejectUnauthorized: false
+  },
+  // Always use these settings for better serverless compatibility
+  max: 1, // Single connection for serverless
+  idleTimeoutMillis: 30000, // 30 seconds
+  connectionTimeoutMillis: 10000, // 10 seconds
+  // Allow exit on idle for serverless
+  allowExitOnIdle: true
+};
+
+// Log connection string info (without password)
+if (databaseUrl) {
+  const urlParts = databaseUrl.match(/postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+  if (urlParts) {
+    console.log('📊 Database connection info:', {
+      user: urlParts[1],
+      host: urlParts[3],
+      port: urlParts[4],
+      database: urlParts[5],
+      isPooler: urlParts[3].includes('pooler'),
+      environment: process.env.VERCEL === '1' ? 'Vercel' : 'Local'
+    });
   }
-});
+}
+
+const pool = new Pool(poolConfig);
 
 // Test database connection
 pool.on('connect', () => {
@@ -29,11 +69,38 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Unexpected error on idle client', err);
+  console.error('❌ Unexpected error on idle client:', {
+    message: err.message,
+    code: err.code,
+    errno: err.errno,
+    syscall: err.syscall,
+    hostname: err.hostname
+  });
 });
+
+// Test database connection on startup
+async function testConnection() {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    console.log('✅ Database connection test successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Database connection test failed:', error.message);
+    console.error('   Please check your DATABASE_URL in .env file');
+    return false;
+  }
+}
+
+// Test connection if not in Vercel serverless environment
+if (process.env.VERCEL !== '1') {
+  testConnection().catch(err => {
+    console.error('❌ Failed to test database connection:', err);
+  });
+}
 
 module.exports = {
   supabase,
-  pool
+  pool,
+  testConnection
 };
 
