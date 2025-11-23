@@ -38,12 +38,23 @@ router.post('/login', async (req, res) => {
         stack: dbError.stack
       });
       
+      // Check if it's a DNS/hostname resolution error (ENOTFOUND)
+      if (dbError.code === 'ENOTFOUND' || dbError.errno === -3007) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database connection failed: Cannot resolve database hostname',
+          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Database hostname not found',
+          hint: 'Please check your DATABASE_URL environment variable in Vercel. The database hostname may be incorrect or the DATABASE_URL may not be set.'
+        });
+      }
+      
       // Check if it's a connection error
       if (dbError.code === 'ECONNREFUSED' || dbError.code === 'ETIMEDOUT' || dbError.message.includes('connection')) {
         return res.status(500).json({
           success: false,
           message: 'Database connection failed. Please check your database configuration.',
-          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Connection error'
+          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Connection error',
+          hint: 'Verify your DATABASE_URL environment variable is set correctly in Vercel.'
         });
       }
       

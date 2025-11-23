@@ -16,8 +16,19 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey
 });
 
 // PostgreSQL Pool for direct database access
+// IMPORTANT: DATABASE_URL must be set in Vercel environment variables
+// Format: postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres
+// Get the correct connection string from Supabase Dashboard > Settings > Database > Connection string
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  console.error('⚠️  WARNING: DATABASE_URL environment variable is not set!');
+  console.error('   Please set DATABASE_URL in your Vercel project settings.');
+  console.error('   Get the connection string from: Supabase Dashboard > Settings > Database');
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:Iz98HAD7jElqdiRk@db.ldtayamrxisvypqzvldo.supabase.co:5432/postgres',
+  connectionString: databaseUrl || 'postgresql://postgres:Iz98HAD7jElqdiRk@db.ldtayamrxisvypqzvldo.supabase.co:5432/postgres',
   ssl: {
     rejectUnauthorized: false
   }

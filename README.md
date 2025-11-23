@@ -331,6 +331,40 @@ const tables = await tablesResponse.json();
 - `npm run setup-admin` - Create/update admin user in database
 - `npm run check-tables` - Check database tables
 
+## Vercel Deployment
+
+### Setting Environment Variables
+
+1. Go to your Vercel project dashboard
+2. Navigate to **Settings** > **Environment Variables**
+3. Add the following required variables:
+
+   - `DATABASE_URL` - Get this from Supabase Dashboard > Settings > Database > Connection string (URI mode)
+     - Format: `postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres`
+     - **Important**: Use the connection string from Supabase, not the hardcoded fallback
+   
+   - `JWT_SECRET` - A secure random string for JWT token signing
+   
+   - `SUPABASE_URL` - Your Supabase project URL
+   
+   - `SUPABASE_ANON_KEY` - Your Supabase anonymous key
+   
+   - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key
+
+4. After adding variables, redeploy your application
+
+### Getting Your Database Connection String
+
+1. Go to [Supabase Dashboard](https://app.supabase.com)
+2. Select your project
+3. Go to **Settings** > **Database**
+4. Scroll to **Connection string** section
+5. Select **URI** mode
+6. Copy the connection string (it includes your password)
+7. Paste it as the `DATABASE_URL` value in Vercel
+
+**Note**: If you see `ENOTFOUND` errors, it means `DATABASE_URL` is not set correctly in Vercel.
+
 ## Notes
 
 - Admin authentication uses the `users` table in your database
@@ -341,6 +375,7 @@ const tables = await tablesResponse.json();
 - Never commit `.env` file to version control
 - Keep all API keys and secrets secure
 - Flutterwave payment integration requires valid API keys
+- **For Vercel**: Always set `DATABASE_URL` environment variable - the hardcoded fallback may not work
 
 ## License
 
