@@ -124,9 +124,11 @@ router.get('/user/email/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     console.log(`[API] GET /api/auth/user/email/:userId - userId: ${userId}`);
+    console.log(`[API] Request headers:`, req.headers);
+    console.log(`[API] Request origin:`, req.get('origin'));
 
-    if (!userId) {
-      console.log('[API] User ID is missing');
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      console.log('[API] User ID is missing or invalid');
       return res.status(400).json({
         success: false,
         message: 'User ID is required'
@@ -193,10 +195,17 @@ router.get('/user/email/:userId', async (req, res) => {
         }
         
         console.log(`[API] User found via Supabase - email: ${data.email ? 'present' : 'missing'}, phone: ${data.phone ? 'present' : 'missing'}`);
+        console.log(`[API] Supabase data object keys:`, Object.keys(data));
+        console.log(`[API] Supabase email value:`, data.email);
+        
+        // Handle case where email might be in a different column or format
+        const emailValue = data.email || data.Email || data.user_email || null;
+        const phoneValue = data.phone || data.Phone || data.user_phone || null;
+        
         return res.json({
           success: true,
-          email: data.email || null,
-          phone: data.phone || null
+          email: emailValue,
+          phone: phoneValue
         });
       } catch (supabaseError) {
         console.error('[API] Supabase fallback also failed:', supabaseError);
@@ -218,11 +227,18 @@ router.get('/user/email/:userId', async (req, res) => {
 
     const user = userResult.rows[0];
     console.log(`[API] User found - email: ${user.email ? 'present' : 'missing'}, phone: ${user.phone ? 'present' : 'missing'}`);
+    console.log(`[API] User object keys:`, Object.keys(user));
+    console.log(`[API] User email value:`, user.email);
+    console.log(`[API] User email type:`, typeof user.email);
+    
+    // Handle case where email might be in a different column or format
+    const emailValue = user.email || user.Email || user.user_email || null;
+    const phoneValue = user.phone || user.Phone || user.user_phone || null;
     
     res.json({
       success: true,
-      email: user.email || null,
-      phone: user.phone || null
+      email: emailValue,
+      phone: phoneValue
     });
   } catch (error) {
     console.error('[API] Unexpected error fetching user email:', error);

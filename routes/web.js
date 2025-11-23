@@ -90,9 +90,11 @@ router.get('/', optionalAuth, async (req, res) => {
           if (error) {
             console.error('[WEB] Supabase client error:', error);
           } else if (data) {
-            userEmail = data.email || '';
-            userPhone = data.phone || '';
+            // Handle different possible column names
+            userEmail = data.email || data.Email || data.user_email || '';
+            userPhone = data.phone || data.Phone || data.user_phone || '';
             console.log(`[WEB] Successfully fetched user via Supabase for userId: ${userId}`);
+            console.log(`[WEB] Supabase data object keys:`, Object.keys(data));
             console.log(`[WEB] Email: ${userEmail ? `"${userEmail}"` : 'MISSING'}`);
             console.log(`[WEB] Phone: ${userPhone ? `"${userPhone}"` : 'MISSING'}`);
           } else {
@@ -102,9 +104,12 @@ router.get('/', optionalAuth, async (req, res) => {
           console.error('[WEB] Supabase fallback also failed:', supabaseError);
         }
       } else if (userResult.rows.length > 0) {
-        userEmail = userResult.rows[0].email || '';
-        userPhone = userResult.rows[0].phone || '';
+        const user = userResult.rows[0];
+        // Handle different possible column names
+        userEmail = user.email || user.Email || user.user_email || '';
+        userPhone = user.phone || user.Phone || user.user_phone || '';
         console.log(`[WEB] Successfully fetched user details for userId: ${userId}`);
+        console.log(`[WEB] User object keys:`, Object.keys(user));
         console.log(`[WEB] Email: ${userEmail ? `"${userEmail}"` : 'MISSING'}`);
         console.log(`[WEB] Phone: ${userPhone ? `"${userPhone}"` : 'MISSING'}`);
       } else {
@@ -113,15 +118,16 @@ router.get('/', optionalAuth, async (req, res) => {
       }
 
       // Render subscription page with parameters
+      // Ensure all values are strings and not undefined/null for EJS template
       res.render('subscription', {
         title: 'Subscription - OgaBook',
-        userId: userId,
-        userEmail: userEmail,
-        userPhone: userPhone,
+        userId: userId || '',
+        userEmail: userEmail || '',
+        userPhone: userPhone || '',
         status: status || 'pending',
-        package: pkg,
+        package: pkg || '',
         billingCycle: billingCycle || 'monthly',
-        amount: amount
+        amount: amount || ''
       });
     } catch (error) {
       console.error('[WEB] Error fetching user details:', error);
@@ -134,13 +140,13 @@ router.get('/', optionalAuth, async (req, res) => {
       // Client-side will attempt to fetch email as fallback
       res.render('subscription', {
         title: 'Subscription - OgaBook',
-        userId: userId,
+        userId: userId || '',
         userEmail: '',
         userPhone: '',
         status: status || 'pending',
-        package: pkg,
+        package: pkg || '',
         billingCycle: billingCycle || 'monthly',
-        amount: amount
+        amount: amount || ''
       });
     }
   } else {

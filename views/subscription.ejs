@@ -258,15 +258,19 @@
 
 <script>
     // Subscription data from server
+    // Safely handle undefined/null values for production
     const subscriptionData = <%- JSON.stringify({
-        userId: typeof userId !== 'undefined' ? userId : '',
-        userEmail: typeof userEmail !== 'undefined' ? userEmail : '',
-        userPhone: typeof userPhone !== 'undefined' ? userPhone : '',
-        status: typeof status !== 'undefined' ? status : '',
-        package: typeof package !== 'undefined' ? package : '',
-        billingCycle: typeof billingCycle !== 'undefined' ? billingCycle : '',
-        amount: typeof amount !== 'undefined' ? amount : ''
+        userId: (typeof userId !== 'undefined' && userId !== null) ? String(userId) : '',
+        userEmail: (typeof userEmail !== 'undefined' && userEmail !== null) ? String(userEmail) : '',
+        userPhone: (typeof userPhone !== 'undefined' && userPhone !== null) ? String(userPhone) : '',
+        status: (typeof status !== 'undefined' && status !== null) ? String(status) : '',
+        package: (typeof package !== 'undefined' && package !== null) ? String(package) : '',
+        billingCycle: (typeof billingCycle !== 'undefined' && billingCycle !== null) ? String(billingCycle) : '',
+        amount: (typeof amount !== 'undefined' && amount !== null) ? String(amount) : ''
     }) %>;
+    
+    // Debug: Log subscription data received from server
+    console.log('[CLIENT] Subscription data from server:', subscriptionData);
 
     // Get URL parameters (fallback to URL if server data is empty)
     function getUrlParams() {
@@ -323,44 +327,67 @@
     // Fetch user email from API if missing
     async function fetchUserEmail(userId) {
         if (!userId) {
-            console.log('fetchUserEmail: No userId provided');
+            console.log('[CLIENT] fetchUserEmail: No userId provided');
             return null;
         }
         
-        console.log('fetchUserEmail: Attempting to fetch email for userId:', userId);
-        const apiUrl = `/api/auth/user/email/${encodeURIComponent(userId)}`;
-        console.log('fetchUserEmail: API URL:', apiUrl);
+        console.log('[CLIENT] fetchUserEmail: Attempting to fetch email for userId:', userId);
+        
+        // Use absolute URL for production compatibility
+        const baseUrl = window.location.origin;
+        const apiUrl = `${baseUrl}/api/auth/user/email/${encodeURIComponent(userId)}`;
+        console.log('[CLIENT] fetchUserEmail: API URL:', apiUrl);
         
         try {
+            // Create abort controller for timeout (compatible with older browsers)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
             const response = await fetch(apiUrl, {
                 method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                signal: controller.signal
             });
             
-            console.log('fetchUserEmail: Response status:', response.status);
-            console.log('fetchUserEmail: Response ok:', response.ok);
+            clearTimeout(timeoutId);
+            
+            console.log('[CLIENT] fetchUserEmail: Response status:', response.status);
+            console.log('[CLIENT] fetchUserEmail: Response ok:', response.ok);
+            console.log('[CLIENT] fetchUserEmail: Response headers:', Object.fromEntries(response.headers.entries()));
             
             if (response.ok) {
                 const data = await response.json();
-                console.log('fetchUserEmail: Response data:', data);
+                console.log('[CLIENT] fetchUserEmail: Response data:', data);
                 if (data.success && data.email) {
-                    console.log('fetchUserEmail: Successfully fetched email:', data.email);
+                    console.log('[CLIENT] fetchUserEmail: Successfully fetched email:', data.email);
                     return data.email;
                 } else {
-                    console.warn('fetchUserEmail: Response successful but no email found:', data);
+                    console.warn('[CLIENT] fetchUserEmail: Response successful but no email found:', data);
                 }
             } else {
-                const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-                console.error('fetchUserEmail: API error response:', response.status, errorData);
+                // Try to get error message from response
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+                }
+                console.error('[CLIENT] fetchUserEmail: API error response:', response.status, errorData);
             }
         } catch (error) {
-            console.error('fetchUserEmail: Network or parsing error:', error);
-            console.error('fetchUserEmail: Error details:', {
-                message: error.message,
-                stack: error.stack
-            });
+            if (error.name === 'AbortError') {
+                console.error('[CLIENT] fetchUserEmail: Request timeout after 10 seconds');
+            } else {
+                console.error('[CLIENT] fetchUserEmail: Network or parsing error:', error);
+                console.error('[CLIENT] fetchUserEmail: Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+            }
         }
         return null;
     }
