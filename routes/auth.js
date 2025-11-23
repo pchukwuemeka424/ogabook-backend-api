@@ -16,11 +16,45 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find user in users table by email
-    const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    );
+    // Normalize email to lowercase for case-insensitive comparison
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user in users table by email (case-insensitive)
+    let result;
+    try {
+      result = await pool.query(
+        'SELECT * FROM users WHERE LOWER(TRIM(email)) = $1',
+        [normalizedEmail]
+      );
+    } catch (dbError) {
+      console.error('Database query error during login:', dbError);
+      console.error('Error details:', {
+        message: dbError.message,
+        code: dbError.code,
+        detail: dbError.detail,
+        hint: dbError.hint
+      });
+      
+      // Check if it's a connection error
+      if (dbError.code === 'ECONNREFUSED' || dbError.code === 'ETIMEDOUT' || dbError.message.includes('connection')) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database connection failed. Please check your database configuration.',
+          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Connection error'
+        });
+      }
+      
+      // Check if table doesn't exist
+      if (dbError.message.includes('does not exist') || dbError.code === '42P01') {
+        return res.status(500).json({
+          success: false,
+          message: 'Database table not found. Please ensure the users table exists.',
+          error: process.env.NODE_ENV === 'development' ? dbError.message : 'Table not found'
+        });
+      }
+      
+      throw dbError;
+    }
 
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -40,7 +74,17 @@ router.post('/login', async (req, res) => {
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    let isValidPassword;
+    try {
+      isValidPassword = await bcrypt.compare(password, user.password_hash);
+    } catch (bcryptError) {
+      console.error('Bcrypt error during password verification:', bcryptError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error verifying password',
+        error: process.env.NODE_ENV === 'development' ? bcryptError.message : 'Password verification failed'
+      });
+    }
 
     if (!isValidPassword) {
       return res.status(401).json({
@@ -49,7 +93,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check if user is active
+    // Check if user is active (handle both boolean and null cases)
     if (user.is_active === false) {
       return res.status(403).json({
         success: false,
@@ -58,16 +102,26 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
-    const token = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email,
-        username: user.username,
-        role: user.role || 'admin'
-      },
-      process.env.JWT_SECRET || 'your_jwt_secret_key_change_this_in_production',
-      { expiresIn: '24h' }
-    );
+    let token;
+    try {
+      token = jwt.sign(
+        { 
+          id: user.id, 
+          email: user.email,
+          username: user.username,
+          role: user.role || 'admin'
+        },
+        process.env.JWT_SECRET || 'your_jwt_secret_key_change_this_in_production',
+        { expiresIn: '24h' }
+      );
+    } catch (jwtError) {
+      console.error('JWT signing error:', jwtError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error generating authentication token',
+        error: process.env.NODE_ENV === 'development' ? jwtError.message : 'Token generation failed'
+      });
+    }
 
     res.json({
       success: true,
@@ -82,10 +136,11 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Server error during login',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
     });
   }
 });

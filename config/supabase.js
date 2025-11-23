@@ -32,8 +32,29 @@ pool.on('error', (err) => {
   console.error('❌ Unexpected error on idle client', err);
 });
 
+// Test database connection on startup
+async function testConnection() {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    console.log('✅ Database connection test successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Database connection test failed:', error.message);
+    console.error('   Please check your DATABASE_URL in .env file');
+    return false;
+  }
+}
+
+// Test connection if not in Vercel serverless environment
+if (process.env.VERCEL !== '1') {
+  testConnection().catch(err => {
+    console.error('❌ Failed to test database connection:', err);
+  });
+}
+
 module.exports = {
   supabase,
-  pool
+  pool,
+  testConnection
 };
 
