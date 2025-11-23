@@ -37,14 +37,28 @@ const poolConfig = {
   connectionString: databaseUrl || 'postgresql://postgres:Iz98HAD7jElqdiRk@db.ldtayamrxisvypqzvldo.supabase.co:5432/postgres',
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  // Always use these settings for better serverless compatibility
+  max: 1, // Single connection for serverless
+  idleTimeoutMillis: 30000, // 30 seconds
+  connectionTimeoutMillis: 10000, // 10 seconds
+  // Allow exit on idle for serverless
+  allowExitOnIdle: true
 };
 
-// For serverless (Vercel), use smaller connection pool and shorter timeouts
-if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
-  poolConfig.max = 1; // Single connection for serverless
-  poolConfig.idleTimeoutMillis = 30000; // 30 seconds
-  poolConfig.connectionTimeoutMillis = 10000; // 10 seconds
+// Log connection string info (without password)
+if (databaseUrl) {
+  const urlParts = databaseUrl.match(/postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+  if (urlParts) {
+    console.log('📊 Database connection info:', {
+      user: urlParts[1],
+      host: urlParts[3],
+      port: urlParts[4],
+      database: urlParts[5],
+      isPooler: urlParts[3].includes('pooler'),
+      environment: process.env.VERCEL === '1' ? 'Vercel' : 'Local'
+    });
+  }
 }
 
 const pool = new Pool(poolConfig);
@@ -55,7 +69,13 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Unexpected error on idle client', err);
+  console.error('❌ Unexpected error on idle client:', {
+    message: err.message,
+    code: err.code,
+    errno: err.errno,
+    syscall: err.syscall,
+    hostname: err.hostname
+  });
 });
 
 // Test database connection on startup

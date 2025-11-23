@@ -23,10 +23,9 @@ router.post('/login', async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Find user in users table by email (case-insensitive)
-    // Try multiple query approaches for compatibility
     let result;
     try {
-      // First try: Simple case-insensitive comparison
+      // Execute query using pool (automatically handles connection management)
       result = await pool.query(
         'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
         [email.trim()]
@@ -71,20 +70,32 @@ router.post('/login', async (req, res) => {
       }
       
       // Return detailed error (show in production for debugging)
-      return res.status(500).json({
+      const errorResponse = {
         success: false,
         message: 'Database query failed',
         error: dbError.message,
-        code: dbError.code,
+        code: dbError.code || 'UNKNOWN',
         hint: dbError.code === 'ENOTFOUND' 
           ? 'Use Connection Pooler URL from Supabase Dashboard > Settings > Database > Connection Pooling'
+          : dbError.code === '28P01' || dbError.message.includes('password')
+          ? 'Database authentication failed. Check your DATABASE_URL password in Vercel.'
+          : dbError.code === '3D000' || dbError.message.includes('database')
+          ? 'Database does not exist. Check your DATABASE_URL connection string.'
           : dbError.hint || 'Check your DATABASE_URL environment variable in Vercel',
         details: {
           code: dbError.code,
           detail: dbError.detail,
-          hint: dbError.hint
+          hint: dbError.hint,
+          errno: dbError.errno,
+          syscall: dbError.syscall,
+          hostname: dbError.hostname
         }
-      });
+      };
+      
+      // Log full error for debugging
+      console.error('[DB ERROR] Full error object:', JSON.stringify(errorResponse, null, 2));
+      
+      return res.status(500).json(errorResponse);
     }
 
     if (result.rows.length === 0) {
