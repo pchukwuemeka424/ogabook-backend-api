@@ -473,5 +473,447 @@ router.post('/query', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Get app_settings (or create default if doesn't exist)
+router.get('/app-setting', authenticateAdmin, async (req, res) => {
+  try {
+    // Check if app_settings table exists
+    const checkTable = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'app_settings'
+      );
+    `);
+
+    if (!checkTable.rows[0].exists) {
+      // Table doesn't exist, return default
+      return res.json({
+        success: true,
+        data: {
+          subscription_enabled: 'true'
+        }
+      });
+    }
+
+    // Get subscription_visible setting by key (using existing key from database)
+    const result = await pool.query(
+      `SELECT key, value FROM app_settings WHERE key = $1`,
+      ['subscription_visible']
+    );
+
+    if (result.rows.length === 0) {
+      // No record exists, return default
+      return res.json({
+        success: true,
+        data: {
+          subscription_enabled: 'true'
+        }
+      });
+    }
+
+    // Extract value from JSONB and convert to lowercase string
+    const settingValue = result.rows[0].value;
+    let subscriptionValue = 'true';
+    
+    if (typeof settingValue === 'string') {
+      subscriptionValue = settingValue.toLowerCase();
+    } else if (typeof settingValue === 'boolean') {
+      subscriptionValue = settingValue ? 'true' : 'false';
+    } else if (settingValue !== null && settingValue !== undefined) {
+      subscriptionValue = String(settingValue).toLowerCase();
+    }
+
+    res.json({
+      success: true,
+      data: {
+        subscription_enabled: subscriptionValue
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching app_settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching app_settings',
+      error: error.message
+    });
+  }
+});
+
+// Update app_settings (only update, do not insert)
+router.put('/app-setting', authenticateAdmin, async (req, res) => {
+  try {
+    const { subscription_enabled } = req.body;
+
+    // Convert input to boolean value: true or false
+    // Toggle: if toggle is checked -> true, unchecked -> false
+    const subscriptionValue = String(subscription_enabled).toLowerCase() === 'true';
+
+    // Check if app_settings table exists
+    const checkTable = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'app_settings'
+      );
+    `);
+
+    if (!checkTable.rows[0].exists) {
+      return res.status(500).json({
+        success: false,
+        message: 'app_settings table does not exist',
+        error: 'Table not found'
+      });
+    }
+
+    // Update existing record only (update value column only)
+    // Using 'subscription_visible' key which exists in the database
+    // Store value as JSONB boolean: true or false (without quotes)
+    const result = await pool.query(
+      `UPDATE app_settings 
+       SET value = $1::jsonb 
+       WHERE key = $2
+       RETURNING *`,
+      [subscriptionValue, 'subscription_visible']
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Setting not found. Please create the subscription_visible setting first.',
+        error: 'Record not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'App settings updated successfully',
+      data: {
+        subscription_enabled: subscriptionValue
+      }
+    });
+  } catch (error) {
+    console.error('Error updating app_settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating app_settings',
+      error: error.message
+    });
+  }
+});
+
+// Get all notification templates
+router.get('/notification-templates', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, title, message, category, is_active, created_at
+      FROM notification_templates
+      WHERE is_active = true
+      ORDER BY name;
+    `);
+
+    res.json({
+      success: true,
+      templates: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching notification templates:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching notification templates',
+      error: error.message
+    });
+  }
+});
+
+// Get manager categories (business types)
+router.get('/managers/categories', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        business_type as category,
+        COUNT(*) as count
+      FROM users
+      WHERE role = 'manager' 
+        AND business_type IS NOT NULL 
+        AND business_type != ''
+      GROUP BY business_type
+      ORDER BY business_type;
+    `);
+
+    res.json({
+      success: true,
+      categories: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching manager categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching manager categories',
+      error: error.message
+    });
+  }
+});
+
+// Get a single notification template by ID
+router.get('/notification-templates/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(`
+      SELECT id, name, title, message, category, is_active
+      FROM notification_templates
+      WHERE id = $1;
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Template not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      template: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error fetching notification template:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching notification template',
+      error: error.message
+    });
+  }
+});
+
+// Send notifications to users
+router.post('/notifications/send', authenticateAdmin, async (req, res) => {
+  try {
+    const { userIds, templateId, title, message, customData } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'User IDs are required'
+      });
+    }
+
+    if (!templateId && !title && !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either template ID or title/message is required'
+      });
+    }
+
+    let finalTitle = title;
+    let finalMessage = message;
+
+    // If template is provided, fetch it and use its content
+    if (templateId) {
+      const templateResult = await pool.query(`
+        SELECT title, message FROM notification_templates WHERE id = $1 AND is_active = true;
+      `, [templateId]);
+
+      if (templateResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Template not found or inactive'
+        });
+      }
+
+      const template = templateResult.rows[0];
+      finalTitle = finalTitle || template.title;
+      finalMessage = finalMessage || template.message;
+    }
+
+    if (!finalTitle || !finalMessage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and message are required'
+      });
+    }
+
+    // Get user details for each user ID
+    // Handle both UUID and text IDs
+    console.log('Sending notifications to user IDs:', userIds);
+    console.log('User IDs type:', typeof userIds, Array.isArray(userIds));
+    
+    // Convert all user IDs to strings to ensure consistency
+    const userIdStrings = userIds.map(id => String(id));
+    console.log('Converted user IDs:', userIdStrings);
+
+    // Use a more flexible query that handles both UUID and text formats
+    let userResults;
+    
+    try {
+      // First try: Use ANY with text array - most compatible
+      userResults = await pool.query(`
+        SELECT id, username, email, first_name, last_name, phone
+        FROM users
+        WHERE id::text = ANY($1::text[])
+      `, [userIdStrings]);
+      console.log(`Text array query found ${userResults.rows.length} users`);
+      
+      // If no results, try with UUID array
+      if (userResults.rows.length === 0 && userIdStrings.length > 0) {
+        console.log('Text array query returned 0 results, trying UUID array...');
+        try {
+          // Try to cast to UUID array
+          userResults = await pool.query(`
+            SELECT id, username, email, first_name, last_name, phone
+            FROM users
+            WHERE id = ANY($1::uuid[])
+          `, [userIdStrings]);
+          console.log(`UUID array query found ${userResults.rows.length} users`);
+        } catch (uuidErr) {
+          console.log('UUID array query failed, trying individual queries:', uuidErr.message);
+          // Fallback: try individual queries
+          const userPromises = userIdStrings.map((userId, index) => 
+            pool.query(`
+              SELECT id, username, email, first_name, last_name, phone
+              FROM users
+              WHERE id::text = $1
+            `, [userId]).catch(err => {
+              console.error(`Error querying user ${userId} (index ${index}):`, err.message);
+              return { rows: [] };
+            })
+          );
+          const results = await Promise.all(userPromises);
+          userResults = {
+            rows: results
+              .map(r => r.rows && r.rows.length > 0 ? r.rows[0] : null)
+              .filter(row => row !== null && row !== undefined)
+          };
+          console.log(`Individual queries found ${userResults.rows.length} users`);
+        }
+      }
+    } catch (error) {
+      console.error('Query error:', error.message);
+      console.error('Error stack:', error.stack);
+      
+      // Final fallback: try individual queries
+      console.log('Trying individual queries as final fallback...');
+      const userPromises = userIdStrings.map((userId, index) => 
+        pool.query(`
+          SELECT id, username, email, first_name, last_name, phone
+          FROM users
+          WHERE id::text = $1
+        `, [userId]).catch(err => {
+          console.error(`Error querying user ${userId} (index ${index}):`, err.message);
+          return { rows: [] };
+        })
+      );
+      const results = await Promise.all(userPromises);
+      userResults = {
+        rows: results
+          .map(r => r.rows && r.rows.length > 0 ? r.rows[0] : null)
+          .filter(row => row !== null && row !== undefined)
+      };
+      console.log(`Final fallback found ${userResults.rows.length} users`);
+    }
+
+    console.log(`Final result: Found ${userResults.rows.length} users out of ${userIds.length} requested`);
+
+    if (userResults.rows.length === 0) {
+      console.error('No users found. User IDs provided:', userIdStrings);
+      // Try to get sample user IDs from database for debugging
+      const sampleUsers = await pool.query('SELECT id::text as id, role FROM users WHERE role = \'manager\' LIMIT 3');
+      console.error('Sample manager IDs in database:', sampleUsers.rows.map(r => ({ id: r.id, role: r.role })));
+      
+      return res.status(404).json({
+        success: false,
+        message: `No users found with the provided IDs. Checked ${userIds.length} IDs.`,
+        providedIds: userIdStrings,
+        requestedCount: userIds.length,
+        debug: {
+          sampleManagerIds: sampleUsers.rows.map(r => r.id)
+        }
+      });
+    }
+
+    // Create notifications for each user
+    const notifications = [];
+    const errors = [];
+
+    for (const user of userResults.rows) {
+      try {
+        // Replace placeholders in message if needed
+        let personalizedMessage = finalMessage;
+        personalizedMessage = personalizedMessage.replace(/\{username\}/g, user.username || 'User');
+        personalizedMessage = personalizedMessage.replace(/\{first_name\}/g, user.first_name || '');
+        personalizedMessage = personalizedMessage.replace(/\{last_name\}/g, user.last_name || '');
+        personalizedMessage = personalizedMessage.replace(/\{email\}/g, user.email || '');
+
+        // Insert notification - using account_id as user identifier
+        // Note: notifications table requires total, paid_amount, and outstanding_balance
+        // For admin notifications, we'll set these to 0
+        // Type must be one of: 'outstanding_payment', 'admin_notification', 'system_notification'
+        // user_role must be one of: 'manager', 'cashier'
+        const notificationResult = await pool.query(`
+          INSERT INTO notifications (
+            account_id,
+            transaction_id,
+            receipt_number,
+            customer_id,
+            customer_name,
+            customer_phone,
+            admin_title,
+            admin_message,
+            type,
+            user_role,
+            total,
+            paid_amount,
+            outstanding_balance,
+            read,
+            created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+          RETURNING id;
+        `, [
+          String(user.id), // account_id
+          `notif-${Date.now()}-${user.id}`, // transaction_id (unique identifier)
+          `NOTIF-${Date.now()}`, // receipt_number
+          String(user.id), // customer_id
+          `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'User', // customer_name
+          user.phone || '', // customer_phone
+          finalTitle, // admin_title
+          personalizedMessage, // admin_message
+          'admin_notification', // type (must be one of: outstanding_payment, admin_notification, system_notification)
+          'manager', // user_role (must be one of: manager, cashier)
+          0, // total (required, set to 0 for admin notifications)
+          0, // paid_amount (required, set to 0 for admin notifications)
+          0, // outstanding_balance (required, set to 0 for admin notifications)
+          false // read
+        ]);
+
+        notifications.push({
+          userId: user.id,
+          notificationId: notificationResult.rows[0].id,
+          userEmail: user.email,
+          userName: user.username
+        });
+      } catch (error) {
+        console.error(`Error creating notification for user ${user.id}:`, error);
+        errors.push({
+          userId: user.id,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Notifications sent to ${notifications.length} user(s)`,
+      notifications,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending notifications',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
 

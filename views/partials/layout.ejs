@@ -371,12 +371,24 @@
                 </a>
             </div>
             <div class="nav-item">
+                <a class="nav-link <%= typeof title !== 'undefined' && title === 'Send Notifications' ? 'active' : '' %>" href="/notifications">
+                    <i class="bi bi-bell"></i>
+                    <span>Notifications</span>
+                </a>
+            </div>
+            <div class="nav-item">
                 <a class="nav-link <%= typeof title !== 'undefined' && title === 'Database Tables' ? 'active' : '' %>" href="/tables">
                     <i class="bi bi-database"></i>
                     <span>All Tables</span>
                 </a>
             </div>
             <div class="nav-divider"></div>
+            <div class="nav-item">
+                <a class="nav-link <%= typeof title !== 'undefined' && title === 'Profile Settings' ? 'active' : '' %>" href="/profile">
+                    <i class="bi bi-person-gear"></i>
+                    <span>Profile Settings</span>
+                </a>
+            </div>
             <div class="nav-item">
                 <a class="nav-link" href="#" onclick="logout(); return false;">
                     <i class="bi bi-box-arrow-right"></i>

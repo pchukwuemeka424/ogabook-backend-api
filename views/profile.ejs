@@ -1,0 +1,195 @@
+<%- include('partials/layout', { title: 'Profile Settings', admin: admin }) %>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-gear me-2"></i>Profile Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="settings-section">
+                    <h6 class="section-title">
+                        <i class="bi bi-credit-card me-2"></i>Subscription Settings
+                    </h6>
+                    <p class="text-muted mb-4">Control subscription features for the application.</p>
+                    
+                    <div class="setting-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <label class="setting-label">Enable Subscriptions</label>
+                                <p class="setting-description text-muted mb-0">
+                                    Toggle to enable or disable subscription functionality across the app.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input 
+                                    class="form-check-input" 
+                                    type="checkbox" 
+                                    role="switch" 
+                                    id="subscriptionToggle"
+                                    style="width: 3rem; height: 1.5rem; cursor: pointer;"
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="button" class="btn btn-primary" id="saveSettingsBtn">
+                        <i class="bi bi-save me-2"></i>Save Settings
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary ms-2" id="resetSettingsBtn">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i>Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .settings-section {
+        padding: 1.5rem 0;
+        border-bottom: 1px solid var(--border, #e0e0e0);
+    }
+
+    .settings-section:last-child {
+        border-bottom: none;
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary, #333);
+        margin-bottom: 0.5rem;
+    }
+
+    .setting-item {
+        padding: 1rem;
+        background-color: var(--light, #f8f9fa);
+        border-radius: 8px;
+        margin-top: 1rem;
+    }
+
+    .setting-label {
+        font-weight: 500;
+        font-size: 1rem;
+        color: var(--text-primary, #333);
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+
+    .setting-description {
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .form-check-input:focus {
+        border-color: #86b7fe;
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+
+<script>
+    let currentSettings = {
+        subscription_enabled: 'true'
+    };
+
+    // Load current settings
+    async function loadSettings() {
+        try {
+            const token = getToken();
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+
+            const response = await apiRequest('/api/database/app-setting');
+            if (response && response.success && response.data) {
+                const value = String(response.data.subscription_enabled || 'true').toLowerCase();
+                currentSettings = {
+                    subscription_enabled: value
+                };
+                
+                // Update toggle (check if value is 'true')
+                document.getElementById('subscriptionToggle').checked = value === 'true';
+            }
+        } catch (error) {
+            console.error('Error loading settings:', error);
+            showToast('Error loading settings: ' + error.message, 'error');
+        }
+    }
+
+    // Save settings
+    async function saveSettings() {
+        try {
+            const token = getToken();
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+
+            const subscriptionEnabled = document.getElementById('subscriptionToggle').checked;
+            const subscriptionValue = subscriptionEnabled ? 'true' : 'false';
+            
+            const saveBtn = document.getElementById('saveSettingsBtn');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+            const response = await apiRequest('/api/database/app-setting', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    subscription_enabled: subscriptionValue
+                })
+            });
+
+            if (response && response.success) {
+                currentSettings.subscription_enabled = subscriptionValue;
+                showToast('Settings saved successfully', 'success');
+            } else {
+                throw new Error(response?.message || 'Failed to save settings');
+            }
+
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            showToast('Error saving settings: ' + error.message, 'error');
+            document.getElementById('saveSettingsBtn').disabled = false;
+            document.getElementById('saveSettingsBtn').innerHTML = '<i class="bi bi-save me-2"></i>Save Settings';
+        }
+    }
+
+    // Reset settings
+    function resetSettings() {
+        document.getElementById('subscriptionToggle').checked = currentSettings.subscription_enabled;
+        showToast('Settings reset to saved values', 'info');
+    }
+
+    // Event listeners
+    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+    document.getElementById('resetSettingsBtn').addEventListener('click', resetSettings);
+
+    // Initialize
+    (async function init() {
+        const token = getToken();
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        await loadSettings();
+    })();
+</script>
+
+<%- include('partials/footer-layout') %>
+

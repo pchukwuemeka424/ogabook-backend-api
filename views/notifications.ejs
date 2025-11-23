@@ -1,0 +1,270 @@
+<%- include('partials/layout', { title: 'Send Notifications', admin: admin }) %>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-bell me-2"></i>Send Notifications</h5>
+    </div>
+    <div class="card-body">
+        <form id="notificationForm">
+            <!-- Template Selection -->
+            <div class="mb-4">
+                <label class="form-label fw-bold">Select Notification Template (Optional)</label>
+                <select class="form-select" id="templateSelect" onchange="loadTemplate()">
+                    <option value="">-- Select a template --</option>
+                </select>
+                <small class="text-muted">Select a template to prefill the notification content</small>
+            </div>
+
+            <!-- Title -->
+            <div class="mb-3">
+                <label class="form-label fw-bold">Title *</label>
+                <input type="text" class="form-control" id="notificationTitle" required placeholder="Enter notification title">
+            </div>
+
+            <!-- Message -->
+            <div class="mb-3">
+                <label class="form-label fw-bold">Message *</label>
+                <textarea class="form-control" id="notificationMessage" rows="6" required placeholder="Enter notification message"></textarea>
+                <small class="text-muted">You can use placeholders: {username}, {first_name}, {last_name}, {email}</small>
+            </div>
+
+            <!-- Info Alert -->
+            <div class="alert alert-info mb-4">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>This notification will be sent to all managers</strong> and inserted into the notifications table.
+            </div>
+
+            <!-- Submit Button -->
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" onclick="resetForm()">Reset</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send me-2"></i>Send Notifications
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Recent Notifications -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Notifications</h5>
+        <button class="btn btn-sm btn-outline-primary" onclick="loadRecentNotifications()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>User</th>
+                        <th>Message</th>
+                        <th>Sent</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="recentNotificationsTable">
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let allUsers = [];
+    let allManagers = [];
+    let categories = [];
+
+    // Load notification templates
+    async function loadTemplates() {
+        try {
+            const data = await apiRequest('/api/database/notification-templates');
+            const select = document.getElementById('templateSelect');
+            
+            if (data.success && data.templates) {
+                data.templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.id;
+                    option.textContent = `${template.name}${template.category ? ` (${template.category})` : ''}`;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+        }
+    }
+
+
+    // Load template content
+    async function loadTemplate() {
+        const templateId = document.getElementById('templateSelect').value;
+        if (!templateId) return;
+
+        try {
+            const data = await apiRequest(`/api/database/notification-templates/${templateId}`);
+            if (data.success && data.template) {
+                document.getElementById('notificationTitle').value = data.template.title || '';
+                document.getElementById('notificationMessage').value = data.template.message || '';
+            }
+        } catch (error) {
+            console.error('Error loading template:', error);
+            showToast('Error loading template: ' + error.message, 'error');
+        }
+    }
+
+    // Load managers only
+    async function loadUsers() {
+        try {
+            const data = await apiRequest('/api/database/tables/users/data?limit=1000');
+            if (data.success && data.data) {
+                allUsers = data.data;
+                // Filter to show only managers
+                allManagers = allUsers.filter(user => user.role === 'manager');
+                console.log(`Loaded ${allManagers.length} managers`);
+            }
+        } catch (error) {
+            console.error('Error loading managers:', error);
+            showToast('Error loading managers: ' + error.message, 'error');
+        }
+    }
+
+    // Reset form
+    function resetForm() {
+        document.getElementById('notificationForm').reset();
+        document.getElementById('templateSelect').value = '';
+    }
+
+    // Submit form
+    document.getElementById('notificationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const title = document.getElementById('notificationTitle').value.trim();
+        const message = document.getElementById('notificationMessage').value.trim();
+        const templateId = document.getElementById('templateSelect').value || null;
+
+        if (!title || !message) {
+            showToast('Please fill in title and message', 'error');
+            return;
+        }
+
+        try {
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+
+            // Get all manager IDs automatically
+            const allManagerIds = allManagers.map(user => String(user.id));
+            console.log('Sending notification to all managers:', allManagerIds.length);
+            
+            const data = await apiRequest('/api/database/notifications/send', {
+                method: 'POST',
+                body: JSON.stringify({
+                    userIds: allManagerIds,
+                    templateId,
+                    title,
+                    message
+                })
+            });
+
+            if (data.success) {
+                if (data.notifications && data.notifications.length > 0) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast('No notifications were sent. Please check the console for details.', 'warning');
+                }
+                if (data.errors && data.errors.length > 0) {
+                    console.error('Notification errors:', data.errors);
+                    showToast(`Some notifications failed. ${data.notifications.length} succeeded, ${data.errors.length} failed.`, 'warning');
+                }
+                resetForm();
+                loadRecentNotifications();
+            } else {
+                const errorMsg = data.message || data.error || 'Error sending notifications';
+                console.error('Notification send error:', data);
+                showToast(errorMsg, 'error');
+                if (data.providedIds) {
+                    console.error('Provided user IDs:', data.providedIds);
+                }
+            }
+        } catch (error) {
+            console.error('Error sending notifications:', error);
+            showToast('Error sending notifications: ' + error.message, 'error');
+        } finally {
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="bi bi-send me-2"></i>Send Notifications';
+        }
+    });
+
+    // Load recent notifications
+    async function loadRecentNotifications() {
+        try {
+            const data = await apiRequest('/api/database/tables/notifications/data?limit=20&page=1');
+            const tbody = document.getElementById('recentNotificationsTable');
+            
+            if (data.success && data.data) {
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No notifications sent yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.data.map(notif => {
+                    const customerName = notif.customer_name || 'Unknown';
+                    const message = (notif.admin_message || '').substring(0, 100) + ((notif.admin_message || '').length > 100 ? '...' : '');
+                    const readStatus = notif.read ? '<span class="badge bg-success">Read</span>' : '<span class="badge bg-warning">Unread</span>';
+                    return `
+                        <tr>
+                            <td>${notif.admin_title || '-'}</td>
+                            <td>${customerName}</td>
+                            <td><small>${message}</small></td>
+                            <td><small>${formatDate(notif.created_at)}</small></td>
+                            <td>${readStatus}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading notifications</td></tr>';
+            }
+        } catch (error) {
+            console.error('Error loading recent notifications:', error);
+            document.getElementById('recentNotificationsTable').innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center text-danger">
+                        Error loading notifications: ${error.message}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // Initialize page
+    function initializeNotificationsPage() {
+        if (!getToken()) {
+            window.location.href = '/login';
+            return;
+        }
+
+        loadTemplates();
+        loadUsers();
+        loadRecentNotifications();
+    }
+
+    // Run initialization
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeNotificationsPage);
+    } else {
+        initializeNotificationsPage();
+    }
+</script>
+
+<%- include('partials/footer-layout') %>
+

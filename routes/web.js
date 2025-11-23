@@ -187,6 +187,22 @@ router.get('/tables', optionalAuth, (req, res) => {
   });
 });
 
+// Profile Settings page
+router.get('/profile', optionalAuth, (req, res) => {
+  res.render('profile', { 
+    title: 'Profile Settings',
+    admin: req.admin || {}
+  });
+});
+
+// Notifications page
+router.get('/notifications', optionalAuth, (req, res) => {
+  res.render('notifications', { 
+    title: 'Send Notifications',
+    admin: req.admin || {}
+  });
+});
+
 // Table data viewer
 router.get('/tables/:tableName', optionalAuth, (req, res) => {
   res.render('table-viewer', { 
