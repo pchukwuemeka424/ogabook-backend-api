@@ -1,185 +1,334 @@
 <%- include('partials/header', { title: 'Subscription - OgaBook' }) %>
 
 <style>
+    * {
+        box-sizing: border-box;
+    }
+
     .subscription-container {
         min-height: 100vh;
-        background: #f9fafb;
+        background: #f5f7fa;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 20px;
+        padding: 16px;
     }
+
     .subscription-card {
         background: white;
         border-radius: 20px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
         max-width: 700px;
         width: 100%;
         overflow: hidden;
+        border: 1px solid rgba(0, 0, 0, 0.05);
     }
+
     .subscription-header {
-        background: #10b981;
-        color: white;
-        padding: 40px 30px;
-        text-align: center;
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
     }
-    .logo-wrapper {
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .header-icon {
+        width: 40px;
+        height: 40px;
+        background: #10b981;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 20px;
+        color: white;
+        font-size: 20px;
+        flex-shrink: 0;
     }
-    .logo-wrapper img {
-        max-width: 120px;
-        max-height: 120px;
-        height: auto;
-        width: auto;
-        object-fit: contain;
-    }
-    .app-name {
-        font-size: 2rem;
+
+    .header-content h1 {
+        font-size: 1.25rem;
         font-weight: 700;
-        margin-bottom: 10px;
-        letter-spacing: 1px;
-    }
-    .subscription-title {
-        font-size: 1.8rem;
-        font-weight: 600;
+        color: #111827;
         margin: 0;
+        line-height: 1.2;
     }
+
+    .header-content p {
+        font-size: 0.8125rem;
+        color: #6b7280;
+        margin: 2px 0 0 0;
+    }
+
     .subscription-body {
-        padding: 40px 30px;
+        padding: 24px;
     }
+
+    .info-box {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .info-box i {
+        color: #0284c7;
+        font-size: 1.125rem;
+        margin-top: 2px;
+        flex-shrink: 0;
+    }
+
+    .info-box p {
+        margin: 0;
+        color: #0c4a6e;
+        line-height: 1.5;
+        font-size: 0.875rem;
+    }
+
     .subscription-details {
-        background: #f0fdf4;
-        border-left: 4px solid #10b981;
-        padding: 25px;
-        border-radius: 8px;
-        margin-bottom: 30px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        padding: 20px;
+        border-radius: 16px;
+        margin-bottom: 24px;
     }
+
     .detail-row {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 0;
-        border-bottom: 1px solid #d1fae5;
+        flex-direction: column;
+        padding: 14px 0;
+        border-bottom: 1px solid #e5e7eb;
+        gap: 6px;
     }
+
     .detail-row:last-child {
         border-bottom: none;
+        padding-bottom: 0;
     }
+
     .detail-label {
         font-weight: 600;
-        color: #166534;
-        font-size: 1rem;
-    }
-    .detail-value {
-        color: #15803d;
-        font-size: 1rem;
-        font-weight: 500;
-    }
-    .package-badge {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.9rem;
+        color: #374151;
+        font-size: 0.8125rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+
+    .detail-label i {
+        font-size: 0.9375rem;
+        color: #6b7280;
+    }
+
+    .detail-value {
+        color: #111827;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        word-break: break-word;
+        margin-left: 28px;
+    }
+
+    .package-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
     .package-badge.basic {
         background: #dbeafe;
         color: #1e40af;
     }
+
     .package-badge.premium {
         background: #fef3c7;
         color: #92400e;
     }
+
     .package-badge.enterprise {
         background: #e9d5ff;
         color: #6b21a8;
     }
+
     .status-badge {
         display: inline-block;
-        padding: 6px 12px;
-        border-radius: 20px;
+        padding: 4px 10px;
+        border-radius: 6px;
         font-weight: 600;
-        font-size: 0.9rem;
+        font-size: 0.75rem;
         text-transform: capitalize;
     }
+
     .status-badge.active {
         background: #d1fae5;
         color: #166534;
     }
+
     .status-badge.inactive {
         background: #fee2e2;
         color: #991b1b;
     }
+
     .billing-cycle {
         text-transform: capitalize;
         font-weight: 500;
     }
+
     .amount-display {
-        font-size: 2rem;
+        font-size: 1.5rem;
         font-weight: 700;
         color: #10b981;
     }
+
     .currency {
-        font-size: 1.2rem;
+        font-size: 1rem;
         color: #6b7280;
-        margin-right: 5px;
+        margin-right: 4px;
     }
+
     .proceed-button {
         background: #10b981;
         border: none;
         border-radius: 12px;
-        padding: 18px 40px;
-        font-size: 1.2rem;
+        padding: 16px 24px;
+        font-size: 1rem;
         font-weight: 600;
         color: white;
         width: 100%;
-        transition: all 0.3s;
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
+        cursor: pointer;
+        min-height: 48px;
     }
+
     .proceed-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
         background: #059669;
-        color: white;
     }
+
     .proceed-button:active {
         transform: translateY(0);
     }
+
     .proceed-button:disabled {
-        opacity: 0.7;
+        opacity: 0.6;
         cursor: not-allowed;
         transform: none;
     }
-    .info-box {
-        background: #eff6ff;
-        border-left: 4px solid #3b82f6;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 25px;
+
+    /* Tablet and Desktop Styles */
+    @media (min-width: 768px) {
+        .subscription-container {
+            padding: 24px;
+        }
+
+        .subscription-header {
+            padding: 24px 32px;
+        }
+
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            font-size: 24px;
+        }
+
+        .header-content h1 {
+            font-size: 1.5rem;
+        }
+
+        .header-content p {
+            font-size: 0.875rem;
+        }
+
+        .subscription-body {
+            padding: 32px;
+        }
+
+        .subscription-details {
+            padding: 28px;
+        }
+
+        .detail-row {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0;
+            padding: 16px 0;
+        }
+
+        .detail-label {
+            font-size: 0.875rem;
+        }
+
+        .detail-value {
+            font-size: 1rem;
+            margin-left: 0;
+            text-align: right;
+        }
+
+        .amount-display {
+            font-size: 2rem;
+        }
+
+        .currency {
+            font-size: 1.25rem;
+        }
+
+        .proceed-button {
+            padding: 18px 40px;
+            font-size: 1.0625rem;
+        }
+
+        .info-box {
+            padding: 16px 20px;
+        }
+
+        .info-box p {
+            font-size: 0.9375rem;
+        }
     }
-    .info-box p {
-        margin: 0;
-        color: #1e40af;
-        line-height: 1.6;
+
+    /* Large Desktop */
+    @media (min-width: 1024px) {
+        .subscription-card {
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
     }
 </style>
 
 <div class="subscription-container">
     <div class="subscription-card">
         <div class="subscription-header">
-            <div class="logo-wrapper">
-                <img src="/assets/logo.png" alt="OgaBook Logo">
+            <div class="header-left">
+                <div class="header-icon">
+                    <i class="bi bi-credit-card"></i>
+                </div>
+                <div class="header-content">
+                    <h1>Subscription Details</h1>
+                    <p>Review and proceed to payment</p>
+                </div>
             </div>
-            <div class="app-name">OgaBook</div>
-            <h1 class="subscription-title">Subscription Details</h1>
         </div>
         
         <div class="subscription-body">
