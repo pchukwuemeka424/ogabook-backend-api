@@ -21,29 +21,10 @@
     .failed-header {
         background: #ef4444;
         color: white;
-        padding: 50px 30px;
-    }
-    .failed-icon-wrapper {
-        width: 100px;
-        height: 100px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 20px;
-    }
-    .failed-icon-wrapper i {
-        font-size: 3.5rem;
-    }
-    .app-name {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 10px;
-        letter-spacing: 1px;
+        padding: 25px 30px;
     }
     .failed-title {
-        font-size: 1.8rem;
+        font-size: 1.5rem;
         font-weight: 600;
         margin: 0;
     }
@@ -68,6 +49,39 @@
         margin: 0;
         color: #92400e;
         line-height: 1.6;
+    }
+    .transaction-details {
+        background: #fef2f2;
+        border-left: 4px solid #ef4444;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        text-align: left;
+    }
+    .transaction-details h5 {
+        color: #991b1b;
+        font-weight: 600;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #fecaca;
+    }
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    .detail-label {
+        font-weight: 600;
+        color: #991b1b;
+    }
+    .detail-value {
+        color: #dc2626;
+        font-family: monospace;
     }
     .action-buttons {
         display: flex;
@@ -121,19 +135,10 @@
 <div class="failed-container">
     <div class="failed-card">
         <div class="failed-header">
-            <div class="failed-icon-wrapper">
-                <i class="bi bi-x-circle"></i>
-            </div>
-            <div class="app-name">OgaBook</div>
             <h1 class="failed-title">Payment Failed</h1>
         </div>
         
         <div class="failed-body">
-            <p class="failed-message">
-                Unfortunately, your payment could not be processed. This could be due to insufficient funds, 
-                incorrect card details, network issues, or declined by your bank.
-            </p>
-            
             <div class="info-box">
                 <p>
                     <i class="bi bi-info-circle me-2"></i>
@@ -142,13 +147,32 @@
                 </p>
             </div>
             
-            <% if (typeof txRef !== 'undefined' && txRef) { %>
-            <div class="info-box" style="margin-top: 15px;">
-                <p style="margin: 0;">
-                    <strong>Transaction Reference:</strong> <code><%= txRef %></code>
-                </p>
+            <div class="transaction-details">
+                <h5>
+                    <i class="bi bi-receipt"></i>
+                    Transaction Details
+                </h5>
+                <div class="detail-item">
+                    <span class="detail-label">Transaction ID:</span>
+                    <span class="detail-value" id="transactionId"><%= transactionId || 'N/A' %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Reference:</span>
+                    <span class="detail-value" id="txRef"><%= txRef || 'N/A' %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Package:</span>
+                    <span class="detail-value"><%= package || 'N/A' %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Billing Cycle:</span>
+                    <span class="detail-value"><%= billingCycle || 'N/A' %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value">₦<%= amount ? parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00' %></span>
+                </div>
             </div>
-            <% } %>
             
             <div class="action-buttons">
                 <a href="<%= typeof userId !== 'undefined' && userId ? `/?userId=${userId}&status=pending&package=basic&billingCycle=monthly&amount=200` : '/' %>" class="btn-primary-custom">
