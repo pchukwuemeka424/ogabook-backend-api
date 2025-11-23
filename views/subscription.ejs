@@ -117,6 +117,10 @@
         padding-bottom: 0;
     }
 
+    .detail-row.hidden {
+        display: none;
+    }
+
     .detail-label {
         font-weight: 600;
         color: #374151;
@@ -340,19 +344,19 @@
             </div>
 
             <div class="subscription-details">
-                <div class="detail-row">
+                <div class="detail-row hidden">
                     <span class="detail-label">
                         <i class="bi bi-person me-2"></i>User ID
                     </span>
                     <span class="detail-value" id="userIdDisplay">-</span>
                 </div>
-                <div class="detail-row">
+                <div class="detail-row hidden">
                     <span class="detail-label">
                         <i class="bi bi-envelope me-2"></i>Email
                     </span>
                     <span class="detail-value" id="emailDisplay">-</span>
                 </div>
-                <div class="detail-row">
+                <div class="detail-row hidden">
                     <span class="detail-label">
                         <i class="bi bi-telephone me-2"></i>Phone
                     </span>
