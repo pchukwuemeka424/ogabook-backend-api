@@ -390,3 +390,4 @@ const tables = await tablesResponse.json();
 
 ISC
 # ogabook-api-
+# ogabook-backend-api
